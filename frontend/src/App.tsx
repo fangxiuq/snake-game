@@ -10,9 +10,22 @@ interface Score {
   created_at: string
 }
 
+type Difficulty = 'easy' | 'normal' | 'hard'
+
+const DIFFICULTY_SPEED: Record<Difficulty, number> = {
+  easy: 400,
+  normal: 250,
+  hard: 150
+}
+
+const DIFFICULTY_LABELS: Record<Difficulty, string> = {
+  easy: '简单',
+  normal: '普通',
+  hard: '困难'
+}
+
 const GRID_SIZE = 20
 const TILE_COUNT = 20
-const GAME_SPEED = 250
 
 function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -32,6 +45,7 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [leaderboard, setLeaderboard] = useState<Score[]>([])
   const [showNameInput, setShowNameInput] = useState(false)
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal')
   const gameLoopRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -203,7 +217,7 @@ function App() {
     setShowGameOver(false)
     spawnFood()
 
-    gameLoopRef.current = window.setInterval(update, GAME_SPEED)
+    gameLoopRef.current = window.setInterval(update, DIFFICULTY_SPEED[difficulty])
   }
 
   const pauseGame = () => {
@@ -307,6 +321,23 @@ function App() {
             <span className="value">{highScore}</span>
           </div>
         </div>
+
+        {!isRunning && !showGameOver && (
+          <div className="difficulty-selector">
+            <span className="difficulty-label">选择难度:</span>
+            <div className="difficulty-buttons">
+              {(Object.keys(DIFFICULTY_SPEED) as Difficulty[]).map((diff) => (
+                <button
+                  key={diff}
+                  className={`difficulty-btn ${difficulty === diff ? 'active' : ''}`}
+                  onClick={() => setDifficulty(diff)}
+                >
+                  {DIFFICULTY_LABELS[diff]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="canvas-wrapper">
           <canvas
