@@ -6,6 +6,11 @@ on:
   pull_request_review_comment:
     types: [created]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   opencode:
     if: |
@@ -16,6 +21,7 @@ jobs:
       id-token: write
       contents: write
       pull-requests: write
+      issues: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
