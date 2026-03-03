@@ -26,4 +26,4 @@ jobs:
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
         with:
-          model: opencode/zen
+          model: minimax/M2.5-free
