@@ -1,27 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import axios from 'axios'
 import './App.css'
-
-interface Score {
-  id: number
-  player_name: string
-  score: number
-  max_score: number
-  created_at: string
-}
 
 type Difficulty = 'easy' | 'normal' | 'hard'
 
 const DIFFICULTY_SPEED: Record<Difficulty, number> = {
   easy: 400,
-  normal: 250,
-  hard: 150
-}
-
-const DIFFICULTY_LABELS: Record<Difficulty, string> = {
-  easy: '简单',
-  normal: '普通',
-  hard: '困难'
+  normal: 200,
+  hard: 120
 }
 
 const GRID_SIZE = 20
@@ -42,34 +27,17 @@ function App() {
   const [isRunning, setIsRunning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [showGameOver, setShowGameOver] = useState(false)
-  const [playerName, setPlayerName] = useState('')
-  const [leaderboard, setLeaderboard] = useState<Score[]>([])
-  const [showNameInput, setShowNameInput] = useState(false)
   const [difficulty, setDifficulty] = useState<Difficulty>('normal')
   const gameLoopRef = useRef<number | null>(null)
 
   useEffect(() => {
-    fetchLeaderboard()
-    const savedHighScore = localStorage.getItem('snakeHighScore')
-    if (savedHighScore) {
-      setHighScore(parseInt(savedHighScore))
-    }
+    const saved = localStorage.getItem('snakeHighScore')
+    if (saved) setHighScore(parseInt(saved, 10))
   }, [])
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/scores?limit=10')
-      setLeaderboard(response.data)
-    } catch (error) {
-      console.error('Failed to fetch leaderboard:', error)
-    }
-  }
-
   const spawnFood = useCallback(() => {
+    let newFood: { x: number; y: number } = { x: 0, y: 0 }
     let validPosition = false
-    let newFood = { x: 0, y: 0 }
     while (!validPosition) {
       newFood = {
         x: Math.floor(Math.random() * TILE_COUNT),
@@ -86,21 +54,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    ctx.fillStyle = '#0a0a15'
+    ctx.fillStyle = '#1a1a2e'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-    ctx.strokeStyle = 'rgba(233, 69, 96, 0.1)'
-    ctx.lineWidth = 0.5
-    for (let i = 0; i <= TILE_COUNT; i++) {
-      ctx.beginPath()
-      ctx.moveTo(i * GRID_SIZE, 0)
-      ctx.lineTo(i * GRID_SIZE, canvas.height)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.moveTo(0, i * GRID_SIZE)
-      ctx.lineTo(canvas.width, i * GRID_SIZE)
-      ctx.stroke()
-    }
 
     const gradient = ctx.createRadialGradient(
       food.x * GRID_SIZE + GRID_SIZE / 2,
@@ -108,13 +63,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       0,
       food.x * GRID_SIZE + GRID_SIZE / 2,
       food.y * GRID_SIZE + GRID_SIZE / 2,
-      GRID_SIZE / 2
+      GRID_SIZE / 2 - 2
     )
     gradient.addColorStop(0, '#ff6b6b')
     gradient.addColorStop(1, '#e94560')
     ctx.fillStyle = gradient
-    ctx.shadowColor = '#e94560'
-    ctx.shadowBlur = 15
     ctx.beginPath()
     ctx.arc(
       food.x * GRID_SIZE + GRID_SIZE / 2,
@@ -123,34 +76,22 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
       0,
       Math.PI * 2
     )
-    ctx.fill()
-    ctx.shadowBlur = 0
 
     snake.forEach((segment, index) => {
       const isHead = index === 0
-      const alpha = 1 - (index / snake.length) * 0.5
-
-      if (isHead) {
-        ctx.fillStyle = '#00ff88'
-        ctx.shadowColor = '#00ff88'
-        ctx.shadowBlur = 10
-      } else {
-        ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`
-        ctx.shadowBlur = 0
-      }
-
+      ctx.fillStyle = isHead ? '#00ff88' : `rgba(0, 255, 136, ${1 - index * 0.05})`
+      
       const radius = isHead ? 6 : 4
       ctx.beginPath()
       ctx.roundRect(
-        segment.x * GRID_SIZE + 1,
-        segment.y * GRID_SIZE + 1,
-        GRID_SIZE - 2,
-        GRID_SIZE - 2,
+        segment.x * GRID_SIZE + 2,
+        segment.y * GRID_SIZE + 2,
+        GRID_SIZE - 4,
+        GRID_SIZE - 4,
         radius
       )
       ctx.fill()
     })
-    ctx.shadowBlur = 0
   }, [snake, food])
 
   useEffect(() => {
@@ -160,19 +101,22 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   const update = useCallback(() => {
     if (isPaused) return
 
-    const newDirection = { ...nextDirection }
-    setDirection(newDirection)
+    const currentDirection = { ...nextDirection }
+    setDirection(currentDirection)
 
     setSnake(prevSnake => {
-      const head = { x: prevSnake[0].x + newDirection.x, y: prevSnake[0].y + newDirection.y }
+      const head = { 
+        x: prevSnake[0].x + currentDirection.x, 
+        y: prevSnake[0].y + currentDirection.y 
+      }
 
       if (head.x < 0 || head.x >= TILE_COUNT || head.y < 0 || head.y >= TILE_COUNT) {
-        gameOver()
+        handleGameOver()
         return prevSnake
       }
 
       if (prevSnake.some(segment => segment.x === head.x && segment.y === head.y)) {
-        gameOver()
+        handleGameOver()
         return prevSnake
       }
 
@@ -194,7 +138,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     })
   }, [nextDirection, isPaused, food, score, highScore, spawnFood])
 
-  const gameOver = () => {
+  const handleGameOver = () => {
     setIsRunning(false)
     if (gameLoopRef.current) {
       clearInterval(gameLoopRef.current)
@@ -219,6 +163,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     setShowGameOver(false)
     spawnFood()
 
+    if (gameLoopRef.current) clearInterval(gameLoopRef.current)
     gameLoopRef.current = window.setInterval(update, DIFFICULTY_SPEED[difficulty])
   }
 
@@ -245,53 +190,47 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
     spawnFood()
   }
 
-  const submitScore = async () => {
-    if (!playerName.trim()) return
-
-    try {
-      await axios.post(`${API_BASE_URL}/api/scores`, {
-        player_name: playerName,
-        score: score,
-        max_score: highScore
-      })
-      await fetchLeaderboard()
-      setShowNameInput(false)
-      setPlayerName('')
-    } catch (error) {
-      console.error('Failed to submit score:', error)
-    }
-  }
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isRunning && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         startGame()
+        return
       }
 
       switch (e.key) {
         case 'ArrowUp':
-          if (direction.y !== 1) setNextDirection({ x: 0, y: -1 })
+          if (direction.y !== 1) {
+            setNextDirection({ x: 0, y: -1 })
+          }
           e.preventDefault()
           break
         case 'ArrowDown':
-          if (direction.y !== -1) setNextDirection({ x: 0, y: 1 })
+          if (direction.y !== -1) {
+            setNextDirection({ x: 0, y: 1 })
+          }
           e.preventDefault()
           break
         case 'ArrowLeft':
-          if (direction.x !== 1) setNextDirection({ x: -1, y: 0 })
+          if (direction.x !== 1) {
+            setNextDirection({ x: -1, y: 0 })
+          }
           e.preventDefault()
           break
         case 'ArrowRight':
-          if (direction.x !== -1) setNextDirection({ x: 1, y: 0 })
+          if (direction.x !== -1) {
+            setNextDirection({ x: 1, y: 0 })
+          }
           e.preventDefault()
           break
         case ' ':
-          if (isRunning) {
+          e.preventDefault()
+          if (showGameOver) {
+            startGame()
+          } else if (isRunning) {
             pauseGame()
-          } else if (!showGameOver) {
+          } else {
             startGame()
           }
-          e.preventDefault()
           break
       }
     }
@@ -310,38 +249,22 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
   return (
     <div className="app">
-      <div className="game-container">
-        <h1>🐍 贪吃蛇</h1>
-        
-        <div className="score-board">
-          <div className="score-item">
-            <span className="label">得分</span>
-            <span className="value">{score}</span>
+      <div className="header">
+        <h1>贪吃蛇</h1>
+        <div className="scores">
+          <div className="score">
+            <span className="score-label">得分</span>
+            <span className="score-value">{score}</span>
           </div>
-          <div className="score-item">
-            <span className="label">最高分</span>
-            <span className="value">{highScore}</span>
+          <div className="score">
+            <span className="score-label">最高分</span>
+            <span className="score-value">{highScore}</span>
           </div>
         </div>
+      </div>
 
-        {!isRunning && !showGameOver && (
-          <div className="difficulty-selector">
-            <span className="difficulty-label">选择难度:</span>
-            <div className="difficulty-buttons">
-              {(Object.keys(DIFFICULTY_SPEED) as Difficulty[]).map((diff) => (
-                <button
-                  key={diff}
-                  className={`difficulty-btn ${difficulty === diff ? 'active' : ''}`}
-                  onClick={() => setDifficulty(diff)}
-                >
-                  {DIFFICULTY_LABELS[diff]}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="canvas-wrapper">
+      <div className="game-area">
+        <div className="canvas-container">
           <canvas
             ref={canvasRef}
             width={GRID_SIZE * TILE_COUNT}
@@ -349,73 +272,59 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
           />
           
           {showGameOver && (
-            <div className="game-over-overlay">
-              <div className="game-over-box">
-                <h2>游戏结束!</h2>
-                <p>最终得分: <span>{score}</span></p>
-                <button onClick={() => setShowNameInput(true)} className="btn-primary">
-                  保存成绩
-                </button>
-                <button onClick={startGame} className="btn-secondary">
+            <div className="modal-overlay">
+              <div className="modal">
+                <h2>游戏结束</h2>
+                <p className="final-score">得分: {score}</p>
+                <button onClick={startGame} className="btn btn-primary">
                   再来一局
                 </button>
               </div>
             </div>
           )}
+        </div>
 
-          {showNameInput && (
-            <div className="name-input-overlay">
-              <div className="name-input-box">
-                <h3>输入你的名字</h3>
-                <input
-                  type="text"
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  placeholder="玩家名"
-                  maxLength={20}
-                  autoFocus
-                />
-                <div className="btn-group">
-                  <button onClick={submitScore} className="btn-primary">
-                    确认
-                  </button>
-                  <button onClick={() => setShowNameInput(false)} className="btn-secondary">
-                    取消
-                  </button>
-                </div>
-              </div>
+        <div className="sidebar">
+          <div className="difficulty-section">
+            <label>难度</label>
+            <div className="difficulty-buttons">
+              <button 
+                className={`btn btn-difficulty ${difficulty === 'easy' ? 'active' : ''}`}
+                onClick={() => setDifficulty('easy')}
+              >
+                简单
+              </button>
+              <button 
+                className={`btn btn-difficulty ${difficulty === 'normal' ? 'active' : ''}`}
+                onClick={() => setDifficulty('normal')}
+              >
+                普通
+              </button>
+              <button 
+                className={`btn btn-difficulty ${difficulty === 'hard' ? 'active' : ''}`}
+                onClick={() => setDifficulty('hard')}
+              >
+                困难
+              </button>
             </div>
-          )}
-        </div>
+          </div>
 
-        <div className="controls">
-          <button onClick={isRunning ? pauseGame : startGame} className="btn-primary">
-            {isRunning ? (isPaused ? '继续' : '暂停') : '开始游戏'}
-          </button>
-          <button onClick={resetGame} className="btn-secondary">
-            重新开始
-          </button>
-        </div>
+          <div className="controls-section">
+            <button 
+              onClick={isRunning ? pauseGame : startGame} 
+              className="btn btn-primary btn-large"
+            >
+              {isRunning ? (isPaused ? '继续' : '暂停') : '开始游戏'}
+            </button>
+            <button onClick={resetGame} className="btn btn-secondary">
+              重新开始
+            </button>
+          </div>
 
-        <div className="instructions">
-          使用方向键 ↑ ↓ ← → 控制蛇的移动<br/>
-          空格键暂停/继续
-        </div>
-      </div>
-
-      <div className="leaderboard">
-        <h2>🏆 排行榜</h2>
-        <div className="leaderboard-list">
-          {leaderboard.map((item, index) => (
-            <div key={item.id} className="leaderboard-item">
-              <span className="rank">{index + 1}</span>
-              <span className="name">{item.player_name}</span>
-              <span className="score">{item.score}</span>
-            </div>
-          ))}
-          {leaderboard.length === 0 && (
-            <div className="empty">暂无记录</div>
-          )}
+          <div className="help-section">
+            <p>↑ ↓ ← → 方向键控制</p>
+            <p>空格键 暂停/继续</p>
+          </div>
         </div>
       </div>
     </div>
