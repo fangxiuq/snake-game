@@ -56,9 +56,11 @@ function App() {
     }
   }, [])
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
   const fetchLeaderboard = async () => {
     try {
-      const response = await axios.get('http://localhost:8000/api/scores?limit=10')
+      const response = await axios.get(`${API_BASE_URL}/api/scores?limit=10')
       setLeaderboard(response.data)
     } catch (error) {
       console.error('Failed to fetch leaderboard:', error)
@@ -247,7 +249,7 @@ function App() {
     if (!playerName.trim()) return
 
     try {
-      await axios.post('http://localhost:8000/api/scores', {
+      await axios.post(`${API_BASE_URL}/api/scores`, {
         player_name: playerName,
         score: score,
         max_score: highScore
